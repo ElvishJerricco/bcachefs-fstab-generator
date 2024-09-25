@@ -13,7 +13,8 @@
     nixosModules.default = ./module.nix;
 
     checks = nixpkgs.lib.genAttrs systems (system: {
-      inherit (nixpkgs.legacyPackages.${system}.callPackage ./tests {}) simple;
+      inherit (nixpkgs.legacyPackages.${system}.callPackage ./tests {})
+        simple encrypted;
     });
   };
 }

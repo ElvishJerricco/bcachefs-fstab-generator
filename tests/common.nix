@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }: let
+{ lib, config, pkgs, ... }: let
   commonConfig = { config, modulesPath, ... }: {
     imports = [
       "${modulesPath}/profiles/base.nix"
@@ -28,7 +28,12 @@
     boot.initrd.systemd.contents."/etc/systemd/journald.conf".source = lib.mkForce config.environment.etc."systemd/journald.conf".source;
   };
 in {
-  nodes.installer = { nodes, config, ... }: {
+  options.extraTargetTestCommands = lib.mkOption {
+    type = lib.types.lines;
+    default = "";
+  };
+
+  config.nodes.installer = { nodes, config, ... }: {
     imports = [
       commonConfig
     ];
@@ -51,7 +56,7 @@ in {
     };
   };
 
-  nodes.target = { modulesPath, ... }: {
+  config.nodes.target = { modulesPath, ... }: {
     imports = [
       commonConfig
     ];
@@ -69,7 +74,7 @@ in {
     hardware.enableAllFirmware = lib.mkForce false;
   };
 
-  testScript = ''
+  config.testScript = ''
     installer.start()
     installer.wait_for_unit("installed.target")
 
@@ -79,6 +84,8 @@ in {
         installer.shutdown()
 
     target.state_dir = installer.state_dir
+    target.start()
+    ${config.extraTargetTestCommands}
     with subtest("Boot new machine"):
         target.wait_for_unit("multi-user.target")
 
