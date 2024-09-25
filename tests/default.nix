@@ -5,4 +5,5 @@
 in {
   simple = runTest ./simple.nix;
   encrypted = runTest ./encrypted.nix;
+  gptAuto = runTest ./gpt-auto.nix;
 }
