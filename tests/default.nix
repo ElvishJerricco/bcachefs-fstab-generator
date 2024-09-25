@@ -4,4 +4,5 @@
   inherit (import (pkgs.path + /nixos/lib/testing-python.nix) { inherit system pkgs; }) runTest;
 in {
   simple = runTest ./simple.nix;
+  encrypted = runTest ./encrypted.nix;
 }
