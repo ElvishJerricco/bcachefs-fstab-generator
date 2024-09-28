@@ -60,6 +60,7 @@ fn gen_unit(dest: &Path, device: String, mountpoint: &Path) -> Result<()> {
     let mountpoint_escaped = sd_escape_path(&mountpoint, ".mount")?;
     let mountpoint_requires = dest.join(format!("{mountpoint_escaped}.requires"));
     let service_name = format!("bcachefs-unlock@{device_escaped}.service");
+    let mountpoint_display = mountpoint.display();
 
     fs::create_dir_all(dest).context(format!("Failed to create directory: {}", dest.display()))?;
     fs::write(
@@ -67,7 +68,7 @@ fn gen_unit(dest: &Path, device: String, mountpoint: &Path) -> Result<()> {
         format!(
             "\
 [Unit]
-Description=Unlock bcachefs file system %f
+Description=Unlock bcachefs file system {mountpoint_display}
 Requires=%i.device
 After=%i.device systemd-makefs@%i.service
 Before={mountpoint_escaped} systemd-fsck@%i.service
@@ -75,7 +76,7 @@ Before={mountpoint_escaped} systemd-fsck@%i.service
 [Service]
 Type=oneshot
 ExecCondition=bcachefs unlock -c %f
-ExecStart=/bin/sh -c 'systemd-ask-password Unlock bcachefs encryption: %f | exec bcachefs unlock %f'
+ExecStart=/bin/sh -c 'systemd-ask-password Unlock bcachefs encryption: {mountpoint_display} | exec bcachefs unlock %f'
 "
         ),
     )
