@@ -14,7 +14,7 @@
 
     checks = nixpkgs.lib.genAttrs systems (system: {
       inherit (nixpkgs.legacyPackages.${system}.callPackage ./tests {})
-        simple encrypted gptAuto gptAutoEncrypted;
+        simple encrypted credential gptAuto gptAutoEncrypted gptAutoCredential;
     });
   };
 }

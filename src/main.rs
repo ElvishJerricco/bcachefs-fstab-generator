@@ -84,7 +84,8 @@ StandardError=journal
 Type=oneshot
 ExecCondition=bcachefs show-super %f
 ExecCondition=bcachefs unlock -c %f
-ExecStart=/bin/sh -c 'systemd-ask-password Unlock bcachefs encryption: {mountpoint_display} | exec bcachefs unlock %f'
+ImportCredential=bcachefs-{mountpoint_escaped}
+ExecStart=/bin/sh -c 'systemd-ask-password --credential=bcachefs-{mountpoint_escaped} Unlock bcachefs encryption: {mountpoint_display} | exec bcachefs unlock %f'
 RemainAfterExit=true
 "
         ),

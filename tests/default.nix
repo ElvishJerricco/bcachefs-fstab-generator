@@ -5,6 +5,8 @@
 in {
   simple = runTest ./simple.nix;
   encrypted = runTest ./encrypted.nix;
+  credential = runTest ./credential.nix;
   gptAuto = runTest ./gpt-auto.nix;
   gptAutoEncrypted = runTest ./gpt-auto-encrypted.nix;
+  gptAutoCredential = runTest ./gpt-auto-credential.nix;
 }
