@@ -19,11 +19,15 @@ fn cmdline_gpt_auto() -> Result<bool> {
 
 fn sd_escape_path<P: AsRef<Path>, S: Into<String>>(path: &P, suffix: S) -> Result<String> {
     let path = path.as_ref();
-    let path_str = path
-        .strip_prefix("/")
-        .context(format!("Path is not absolute: {}", path.display()))?
-        .to_str()
-        .context(format!("Couldn't convert path to str: {}", path.display()))?;
+    let path_str = (if path == Path::new("/") {
+        path
+    } else {
+        path.strip_prefix("/")
+            .context(format!("Path is not absolute: {}", path.display()))?
+    })
+    .to_str()
+    .context(format!("Couldn't convert path to str: {}", path.display()))?;
+
     Ok(format!("{}{}", unit::escape_name(path_str), suffix.into()))
 }
 
