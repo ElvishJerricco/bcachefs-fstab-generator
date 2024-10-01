@@ -72,6 +72,7 @@ Description=Unlock bcachefs file system {mountpoint_display}
 Requires=%i.device
 After=%i.device systemd-makefs@%i.service
 Before={mountpoint_escaped} systemd-fsck@%i.service
+DefaultDependencies=false
 
 [Service]
 StandardOutput=null
