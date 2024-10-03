@@ -58,13 +58,66 @@ fn device_to_path(device: String) -> Result<PathBuf> {
     bail!("Failed to convert fs spec to device path: {}", device)
 }
 
-fn gen_unit(dest: &Path, device: String, mountpoint: &Path) -> Result<()> {
+fn extra_dependencies(opts: Vec<String>) -> Result<String> {
+    let mut after = vec![];
+    let mut requires = vec![];
+    let mut wants = vec![];
+    let mut requires_mounts = vec![];
+
+    fn escape_dep(v: &str) -> Result<String> {
+        if v.starts_with("/dev/") {
+            sd_escape_path(&v, ".device")
+        } else if v.starts_with("/") {
+            sd_escape_path(&v, ".mount")
+        } else {
+            Ok(String::from(v))
+        }
+    }
+
+    for o in opts {
+        if let Some(v) = o.strip_prefix("x-systemd.after=") {
+            let ev = escape_dep(v)?;
+            after.push(ev);
+        }
+        if let Some(v) = o.strip_prefix("x-systemd.requires=") {
+            let ev = escape_dep(v)?;
+            after.push(ev.clone());
+            requires.push(ev);
+        }
+        if let Some(v) = o.strip_prefix("x-systemd.wants=") {
+            let ev = escape_dep(v)?;
+            after.push(ev.clone());
+            wants.push(ev);
+        }
+        if let Some(v) = o.strip_prefix("x-systemd.requires-mounts-for=") {
+            requires_mounts.push(String::from(v));
+        }
+    }
+
+    Ok(vec![
+        ("After", after),
+        ("Requires", requires),
+        ("Wants", wants),
+        ("RequiresMountsFor", requires_mounts),
+    ]
+    .into_iter()
+    .filter(|(_, vals)| !vals.is_empty())
+    .map(|(field, vals)| {
+        let svals = vals.join(" ");
+        format!("{field}={svals}")
+    })
+    .collect::<Vec<_>>()
+    .join("\n"))
+}
+
+fn gen_unit(dest: &Path, device: String, mountpoint: &Path, opts: Vec<String>) -> Result<()> {
     let device_path = device_to_path(device)?;
     let device_escaped = sd_escape_path(&device_path, "")?;
     let mountpoint_escaped = sd_escape_path(&mountpoint, ".mount")?;
     let mountpoint_requires = dest.join(format!("{mountpoint_escaped}.requires"));
     let service_name = format!("bcachefs-unlock@{device_escaped}.service");
     let mountpoint_display = mountpoint.display();
+    let extra_deps = extra_dependencies(opts)?;
 
     fs::create_dir_all(dest).context(format!("Failed to create directory: {}", dest.display()))?;
     fs::write(
@@ -77,6 +130,7 @@ Requires=%i.device
 After=%i.device systemd-makefs@%i.service
 Before={mountpoint_escaped} systemd-fsck@%i.service
 DefaultDependencies=false
+{extra_deps}
 
 [Service]
 Type=oneshot
@@ -125,7 +179,11 @@ fn run(dest: &Path, fstab: &Path, in_initrd: bool) -> Result<()> {
     };
 
     let gpt_auto = if in_initrd && cmdline_gpt_auto()? {
-        Some(("/dev/gpt-auto-root".to_string(), PathBuf::from("/sysroot")))
+        Some((
+            "/dev/gpt-auto-root".to_string(),
+            PathBuf::from("/sysroot"),
+            vec![],
+        ))
     } else {
         None
     };
@@ -144,13 +202,15 @@ fn run(dest: &Path, fstab: &Path, in_initrd: bool) -> Result<()> {
             } else {
                 e.mountpoint.clone()
             };
-            Ok((e.fs_spec.clone(), full_mountpoint))
+            Ok((e.fs_spec.clone(), full_mountpoint, e.mount_options.clone()))
         })
         // Collect errors
         .collect::<Result<Vec<_>>>()?
         .into_iter()
         .chain(gpt_auto.into_iter())
-        .try_for_each(|(device, mountpoint)| gen_unit(dest, device, mountpoint.as_path()))
+        .try_for_each(|(device, mountpoint, opts)| {
+            gen_unit(dest, device, mountpoint.as_path(), opts)
+        })
 }
 
 fn main() -> Result<()> {
