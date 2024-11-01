@@ -9,7 +9,7 @@ use systemd::unit;
 
 fn cmdline_gpt_auto() -> Result<bool> {
     let text = env::var("SYSTEMD_PROC_CMDLINE")
-        .unwrap_or(fs::read_to_string("/proc/cmdline").context("Failed to read /proc/cmdline")?);
+        .or_else(|_| fs::read_to_string("/proc/cmdline").context("Failed to read /proc/cmdline"))?;
     Ok(Some("root=gpt-auto")
         == text
             .split_whitespace()
@@ -222,7 +222,7 @@ fn main() -> Result<()> {
 
     if env::var("SYSTEMD_IN_INITRD")
         .map(|v| ["1", "yes", "on", "true"].contains(&v.as_str()))
-        .unwrap_or(Path::new("/etc/initrd-release").exists())
+        .unwrap_or_else(|_| Path::new("/etc/initrd-release").exists())
     {
         run(
             &dest,
