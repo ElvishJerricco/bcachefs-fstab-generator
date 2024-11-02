@@ -7,14 +7,12 @@ use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use systemd::unit;
 
-fn cmdline_gpt_auto() -> Result<bool> {
-    let text = env::var("SYSTEMD_PROC_CMDLINE")
-        .or_else(|_| fs::read_to_string("/proc/cmdline").context("Failed to read /proc/cmdline"))?;
-    Ok(Some("root=gpt-auto")
-        == text
-            .split_whitespace()
-            .filter(|arg| arg.starts_with("root="))
-            .last())
+fn cmdline_vals(cmdline: &str, key: &str) -> Vec<String> {
+    cmdline
+        .split_whitespace()
+        .filter_map(|val| val.strip_prefix(key))
+        .map(str::to_string)
+        .collect()
 }
 
 fn sd_escape_path<P: AsRef<Path>, S: Into<String>>(path: &P, suffix: S) -> Result<String> {
@@ -178,12 +176,30 @@ fn run(dest: &Path, fstab: &Path, in_initrd: bool) -> Result<()> {
         }
     };
 
-    let gpt_auto = if in_initrd && cmdline_gpt_auto()? {
-        Some((
-            "/dev/gpt-auto-root".to_string(),
-            PathBuf::from("/sysroot"),
-            vec![],
-        ))
+    let cmdline: Option<(String, PathBuf, Vec<String>)> = if in_initrd {
+        let cmdline = env::var("SYSTEMD_PROC_CMDLINE").or_else(|_| {
+            fs::read_to_string("/proc/cmdline").context("Failed to read /proc/cmdline")
+        })?;
+        cmdline_vals(&cmdline, "rootfstype=")
+            .last()
+            .filter(|ty| ty.as_str() == "bcachefs")
+            .and_then(|_| cmdline_vals(&cmdline, "root=").into_iter().last())
+            .and_then(|root_dev| match root_dev.as_str() {
+                "gpt-auto" => Some("/dev/gpt-auto-root".to_string()),
+                "fstab" => None,
+                _ => Some(root_dev),
+            })
+            .map(|root_dev| {
+                (
+                    root_dev,
+                    PathBuf::from("/sysroot"),
+                    cmdline_vals(&cmdline, "rootflags=")
+                        .iter()
+                        .flat_map(|opts| opts.split(','))
+                        .map(str::to_string)
+                        .collect(),
+                )
+            })
     } else {
         None
     };
@@ -207,7 +223,7 @@ fn run(dest: &Path, fstab: &Path, in_initrd: bool) -> Result<()> {
         // Collect errors
         .collect::<Result<Vec<_>>>()?
         .into_iter()
-        .chain(gpt_auto.into_iter())
+        .chain(cmdline.into_iter())
         .try_for_each(|(device, mountpoint, opts)| {
             gen_unit(dest, device, mountpoint.as_path(), opts)
         })
