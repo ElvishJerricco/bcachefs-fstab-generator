@@ -38,6 +38,8 @@ in {
   nodes.target = { config, ... }: {
     boot.initrd.systemd.services.unlock-bcachefs--.enable = false;
     boot.initrd.systemd.root = "gpt-auto";
+    boot.kernelParams = [ "rootfstype=bcachefs" ];
+    boot.initrd.systemd.managerEnvironment.SYSTEMD_DISSECT_FILE_SYSTEMS = "bcachefs";
     boot.initrd.secrets."/etc/credstore/bcachefs-sysroot.mount" = null;
     boot.initrd.systemd.services."bcachefs-unlock@".after = [ "initrd-nixos-copy-secrets.service" ];
     virtualisation.fileSystems = lib.mkForce { };

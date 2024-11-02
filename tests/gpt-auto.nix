@@ -34,6 +34,8 @@ in {
   nodes.target = { config, ... }: {
     boot.initrd.systemd.services.unlock-bcachefs--.enable = false;
     boot.initrd.systemd.root = "gpt-auto";
+    boot.kernelParams = [ "rootfstype=bcachefs" ];
+    boot.initrd.systemd.managerEnvironment.SYSTEMD_DISSECT_FILE_SYSTEMS = "bcachefs";
     virtualisation.fileSystems = lib.mkForce { };
   };
 }
