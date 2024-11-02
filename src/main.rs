@@ -167,6 +167,13 @@ RemainAfterExit=true
 }
 
 fn initrd_prefix<P: AsRef<Path>>(mountpoint: P) -> Result<PathBuf> {
+    let mut buf = PathBuf::from("/sysroot");
+    if mountpoint.as_ref() == Path::new("/") {
+        // Shortcut to avoid unnecessary trailing slash. This isn't
+        // functionally necessary, but it makes log output cleaner and
+        // more consisitent.
+        return Ok(buf);
+    }
     let relative = mountpoint
         .as_ref()
         .strip_prefix(Path::new("/"))
@@ -174,7 +181,8 @@ fn initrd_prefix<P: AsRef<Path>>(mountpoint: P) -> Result<PathBuf> {
             "Path is not absolute: {}",
             mountpoint.as_ref().display()
         ))?;
-    Ok(Path::new("/sysroot").join(relative))
+    buf.push(relative);
+    Ok(buf)
 }
 
 fn run(dest: &Path, fstab: &Path, in_initrd: bool) -> Result<()> {

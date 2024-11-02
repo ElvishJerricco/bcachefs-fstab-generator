@@ -40,8 +40,8 @@ in {
     virtualisation.fileSystems = lib.mkForce { };
   };
 
-  extraTargetTestCommands = ''
-    target.wait_for_console_text("Unlock bcachefs encryption:")
-    target.send_console("somepass\n")
-  '';
+  testing.bcachefs.encryption = {
+    enable = true;
+    passphrase = "somepass";
+  };
 }

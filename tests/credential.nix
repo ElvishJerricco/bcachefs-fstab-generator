@@ -45,4 +45,6 @@ in {
       };
     };
   };
+
+  testing.bcachefs.encryption.enable = true;
 }

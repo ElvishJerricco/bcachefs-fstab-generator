@@ -44,4 +44,6 @@ in {
     boot.initrd.systemd.services."bcachefs-unlock@".after = [ "initrd-nixos-copy-secrets.service" ];
     virtualisation.fileSystems = lib.mkForce { };
   };
+
+  testing.bcachefs.encryption.enable = true;
 }

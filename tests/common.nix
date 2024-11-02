@@ -1,4 +1,6 @@
 { lib, config, pkgs, ... }: let
+  cfg = config.testing.bcachefs;
+
   commonConfig = { config, modulesPath, ... }: {
     imports = [
       "${modulesPath}/profiles/base.nix"
@@ -28,9 +30,12 @@
     boot.initrd.systemd.contents."/etc/systemd/journald.conf".source = lib.mkForce config.environment.etc."systemd/journald.conf".source;
   };
 in {
-  options.extraTargetTestCommands = lib.mkOption {
-    type = lib.types.lines;
-    default = "";
+  options.testing.bcachefs.encryption = {
+    enable = lib.mkEnableOption "bcachefs encryption testing";
+    passphrase = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
   };
 
   config.nodes.installer = { nodes, config, ... }: {
@@ -83,10 +88,24 @@ in {
         installer.succeed("sync")
         installer.shutdown()
 
+    import json
+    with open("${builtins.toFile "encryption.json" (builtins.toJSON cfg.encryption)}") as f:
+        encryption = json.load(f)
+    
+    def wait_and_decrypt():
+        if not encryption["enable"]:
+            target.wait_for_console_text("Condition check resulted in Unlock bcachefs file system /sysroot being skipped.")
+        else:
+            target.wait_for_console_text("Starting Unlock bcachefs file system /sysroot")
+            if encryption["passphrase"] is not None:
+                target.wait_for_console_text("Unlock bcachefs encryption:")
+                target.send_console(f"{encryption["passphrase"]}\n")
+            target.wait_for_console_text("Finished Unlock bcachefs file system /sysroot")
+
     target.state_dir = installer.state_dir
     target.start()
-    ${config.extraTargetTestCommands}
     with subtest("Boot new machine"):
+        wait_and_decrypt()
         target.wait_for_unit("multi-user.target")
 
     target.shutdown()
