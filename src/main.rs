@@ -1,5 +1,7 @@
 use anyhow::{bail, Context, Result};
+use env_logger;
 use fstab::FsTab;
+use log;
 use std::env;
 use std::fs;
 use std::io::ErrorKind;
@@ -109,6 +111,16 @@ fn extra_dependencies(opts: Vec<String>) -> Result<String> {
 }
 
 fn gen_unit(dest: &Path, device: String, mountpoint: &Path, opts: Vec<String>) -> Result<()> {
+    log::debug!(
+        "\
+Generating units for:
+dest: {dest:?}
+device: {device}
+mountpoint: {mountpoint:?}
+opts: {opts:?}
+"
+    );
+
     let device_path = device_to_path(device)?;
     let device_escaped = sd_escape_path(&device_path, "")?;
     let mountpoint_escaped = sd_escape_path(&mountpoint, ".mount")?;
@@ -184,10 +196,13 @@ fn run(dest: &Path, fstab: &Path, in_initrd: bool) -> Result<()> {
             .last()
             .filter(|ty| ty.as_str() == "bcachefs")
             .and_then(|_| cmdline_vals(&cmdline, "root=").into_iter().last())
-            .and_then(|root_dev| match root_dev.as_str() {
-                "gpt-auto" => Some("/dev/gpt-auto-root".to_string()),
-                "fstab" => None,
-                _ => Some(root_dev),
+            .and_then(|root_dev| {
+                log::debug!("Found root device: {root_dev}");
+                match root_dev.as_str() {
+                    "gpt-auto" => Some("/dev/gpt-auto-root".to_string()),
+                    "fstab" => None,
+                    _ => Some(root_dev),
+                }
             })
             .map(|root_dev| {
                 (
@@ -207,7 +222,11 @@ fn run(dest: &Path, fstab: &Path, in_initrd: bool) -> Result<()> {
     entries
         .iter()
         .filter(|e| e.vfs_type == "bcachefs")
-        .filter(|e| !in_initrd || e.mount_options.contains(&"x-initrd.mount".to_string()))
+        .filter(|e| {
+            let will_use = !in_initrd || e.mount_options.contains(&"x-initrd.mount".to_string());
+            log::debug!("Found bcachefs: {0:?}, will_use: {will_use}", e.mountpoint);
+            will_use
+        })
         // Add /sysroot prefix in initrd
         .map(|e| {
             let full_mountpoint = if in_initrd {
@@ -230,6 +249,10 @@ fn run(dest: &Path, fstab: &Path, in_initrd: bool) -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    env_logger::init();
+
+    log::debug!("Generating bcachefs units");
+
     let arg = env::args()
         .skip(1)
         .next()

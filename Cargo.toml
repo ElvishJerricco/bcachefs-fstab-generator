@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.89"
+env_logger = "0.11.5"
 fstab = "0.4.0"
 libsystemd-sys = { version = "0.9.3", default-features = false }
+log = "0.4.22"
 systemd = { version = "0.10.0", default-features = false }
